@@ -5,11 +5,11 @@ FROM golang:1.19-alpine AS build-go
 
 WORKDIR /app
 
-COPY go.mod ./
-COPY go.sum ./
+COPY ./backend/go.mod ./
+COPY ./backend/go.sum ./
 RUN go mod download
 
-COPY ./ ./
+COPY ./backend ./
 
 RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o home-server main.go
 
