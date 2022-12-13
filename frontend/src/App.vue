@@ -10,7 +10,7 @@ html {
       <div class="col-md-6 offset-md-3 py-5">
         <h1 class="text-center">Найти фильм</h1>
         <br>
-        <form v-on:submit.prevent="makeWebsiteThumbnail">
+        <form v-on:submit.prevent="search">
           <div class="form-group">
             <input v-model="movieName" type="text" id="website-input" placeholder="Введите название фильма"
                    class="form-control">
@@ -59,7 +59,7 @@ html {
             </tr>
             <tr v-for="item in getItems" :key="item">
               <td>
-                <button type="button" class="btn btn-primary" v-on:click="download(item.blackholeLink)">
+                <button type="button" class="btn btn-primary" v-on:click="download(item)">
                   <span class="glyphicon glyphicon-download-alt" aria-hidden="true"></span>
                 </button>
               </td>
@@ -117,7 +117,7 @@ export default {
   },
 
   methods: {
-    makeWebsiteThumbnail() {
+    search() {
       this.isDownload = true
       this.items = []
       this.isNew = false
@@ -131,8 +131,8 @@ export default {
             this.isDownload = false
           })
     },
-    download(url) {
-      axios.get(url)
+    download(item) {
+      axios.post("/api/download", {trackerId : item.trackerId, downloadLink: item.downloadLink})
           .then((response) => {
             console.log(response)
           })

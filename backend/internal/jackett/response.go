@@ -53,3 +53,7 @@ type Response struct {
 		Error   interface{} `json:"Error"`
 	} `json:"Indexers"`
 }
+
+type Download struct {
+	Result string `json:"result"`
+}

@@ -53,3 +53,35 @@ func (c *Client) Search(search string) (Response, error) {
 
 	return r, nil
 }
+
+func (c *Client) Download(trackerId, downloadLink string) error {
+	var res *http.Response
+	var err error
+	var r Download
+
+	params := url.Values{}
+	params.Add("jackett_apikey", c.apikey)
+
+	request := fmt.Sprintf("%s/bh/%s/?%s&%s", c.jackettUrl, trackerId, params.Encode(), downloadLink)
+	c.id++
+
+	if res, err = http.Get(request); err != nil {
+		return errors.New(fmt.Sprintf("http get error: %s", err))
+	}
+	defer res.Body.Close()
+
+	var body []byte
+	if body, err = ioutil.ReadAll(res.Body); err != nil {
+		return errors.New(fmt.Sprintf("http read body error: %s", err))
+	}
+
+	if err = json.Unmarshal(body, &r); err != nil {
+		return errors.New(fmt.Sprintf("http unmarshal body error:%s", err))
+	}
+
+	if r.Result == "success" {
+		return nil
+	}
+
+	return errors.New("не удалось поставить на закачку")
+}
