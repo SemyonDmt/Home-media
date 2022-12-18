@@ -191,6 +191,10 @@ function showToastSuccess(): void {
 
     a {
       color: #428bca;
+
+      &:visited {
+        color: #565e64!important;
+      }
     }
   }
 }
