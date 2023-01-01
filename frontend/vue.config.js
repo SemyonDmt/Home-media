@@ -16,5 +16,9 @@ module.exports = defineConfig({
         target: 'http://localhost:3000',
       }
     }
+  },
+  pwa: {
+    name: "Home-media",
+    themeColor: "#ffffff"
   }
 })

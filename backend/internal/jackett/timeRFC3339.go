@@ -1,7 +1,6 @@
 package jackett
 
 import (
-	"fmt"
 	"strings"
 	"time"
 )
@@ -10,17 +9,13 @@ type TimeRFC3339 struct {
 	time.Time
 }
 
-func (ct *TimeRFC3339) UnmarshalJSON(b []byte) error {
-	s := strings.Trim(string(b), "\"")
-	if s == "null" {
-		ct.Time = time.Time{}
-		return nil
+func (ct *TimeRFC3339) UnmarshalJSON(b []byte) (err error) {
+	str := strings.Trim(string(b), `"`)
+	if str == "0001-01-01T00:00:00" {
+	} else if len(str) == 19 {
+		ct.Time, err = time.Parse(time.RFC3339, str+"Z")
+	} else {
+		ct.Time, err = time.Parse(time.RFC3339, str)
 	}
-	t, err := time.Parse(time.RFC3339, s)
-
-	ct.Time = t
-	if err != nil {
-		fmt.Println("Parse", err)
-	}
-	return nil
+	return
 }
