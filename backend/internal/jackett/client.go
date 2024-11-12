@@ -1,9 +1,12 @@
 package jackett
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -54,34 +57,36 @@ func (c *Client) Search(search string) (Response, error) {
 	return r, nil
 }
 
-func (c *Client) Download(trackerId, downloadLink string) error {
+func (c *Client) DownloadBase64EncodedTorrentContentBase64(trackerId, link string) (string, error) {
 	var res *http.Response
 	var err error
-	var r Download
 
 	params := url.Values{}
 	params.Add("jackett_apikey", c.apikey)
 
-	request := fmt.Sprintf("%s/bh/%s/?%s&%s", c.jackettUrl, trackerId, params.Encode(), downloadLink)
-	c.id++
+	request := fmt.Sprintf("%s/dl/%s/?%s&%s", c.jackettUrl, trackerId, params.Encode(), link)
 
-	if res, err = http.Get(request); err != nil {
-		return errors.New(fmt.Sprintf("http get error: %s", err))
+	res, err = http.Get(request)
+	if err != nil {
+		return "", fmt.Errorf("http get error: %w", err)
 	}
 	defer res.Body.Close()
 
 	var body []byte
 	if body, err = ioutil.ReadAll(res.Body); err != nil {
-		return errors.New(fmt.Sprintf("http read body error: %s", err))
+		return "", fmt.Errorf("http read body error: %w", err)
 	}
 
-	if err = json.Unmarshal(body, &r); err != nil {
-		return errors.New(fmt.Sprintf("http unmarshal body error:%s", err))
+	buffer := new(bytes.Buffer)
+	encoder := base64.NewEncoder(base64.StdEncoding, buffer)
+
+	if _, err = io.Copy(encoder, bytes.NewReader(body)); err != nil {
+		return "", fmt.Errorf("can't copy file content into the base64 encoder: %w", err)
 	}
 
-	if r.Result == "success" {
-		return nil
+	if err = encoder.Close(); err != nil {
+		return "", fmt.Errorf("can't flush last bytes of the base64 encoder: %w", err)
 	}
 
-	return errors.New("не удалось поставить на закачку")
+	return buffer.String(), nil
 }

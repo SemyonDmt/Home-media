@@ -7,4 +7,5 @@ type Request struct {
 type Download struct {
 	TrackerId    string `json:"trackerId"`
 	DownloadLink string `json:"downloadLink"`
+	DownloadDir  string `json:"downloadDir"`
 }

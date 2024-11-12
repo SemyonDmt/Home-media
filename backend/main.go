@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/SemyonDmt/home-media/internal/api"
 	"github.com/SemyonDmt/home-media/internal/jackett"
+	"github.com/SemyonDmt/home-media/internal/transmission"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"net/http"
@@ -16,6 +17,7 @@ func main() {
 	url := os.Getenv("JACKETT_URL")
 	key := os.Getenv("JACKETT_APIKEY")
 	j := jackett.New(url, key)
+	t := transmission.New("192.168.1.100", "", "")
 
 	e := echo.New()
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
@@ -24,7 +26,8 @@ func main() {
 	e.Static("/", "./frontend/dist")
 	e.File("/", "./frontend/dist/index.html")
 	e.POST("/api/items", searchTrackersHandler(j))
-	e.POST("/api/download", downloadTrackersHandler(j))
+	e.POST("/api/download", downloadTrackersToFolderHandler(j, t))
+	e.GET("/api/folders-for-download", foldersForDownloadHandler(t))
 	e.Logger.Fatal(e.Start(hostAddress))
 }
 
@@ -46,7 +49,7 @@ func searchTrackersHandler(j *jackett.Client) func(c echo.Context) error {
 					Size:         item.Size,
 					Details:      item.Details,
 					TrackerId:    item.TrackerID,
-					DownloadLink: item.BlackholeLink[strings.Index(item.BlackholeLink, p)+1:],
+					DownloadLink: item.Link[strings.Index(item.Link, p)+1:],
 				}
 			}
 			sort.Slice(response, func(i, j int) bool {
@@ -57,13 +60,26 @@ func searchTrackersHandler(j *jackett.Client) func(c echo.Context) error {
 	}
 }
 
-func downloadTrackersHandler(j *jackett.Client) func(c echo.Context) error {
+func foldersForDownloadHandler(t *transmission.Client) func(c echo.Context) error {
+	return func(c echo.Context) error {
+		return c.JSON(http.StatusOK, t.FoldersForDownload())
+	}
+}
+
+func downloadTrackersToFolderHandler(j *jackett.Client, t *transmission.Client) func(c echo.Context) error {
 	return func(c echo.Context) error {
 		r := new(api.Download)
 		if err := c.Bind(r); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
-		if err := j.Download(r.TrackerId, r.DownloadLink); err != nil {
+
+		b64, err := j.DownloadBase64EncodedTorrentContentBase64(r.TrackerId, r.DownloadLink)
+		if err != nil {
+			return c.JSON(http.StatusOK, api.DownloadResult{Result: false, ErrorMessage: err.Error()})
+		}
+
+		err = t.DownloadToDir(r.DownloadDir, b64)
+		if err != nil {
 			return c.JSON(http.StatusOK, api.DownloadResult{Result: false, ErrorMessage: err.Error()})
 		} else {
 			return c.JSON(http.StatusOK, api.DownloadResult{Result: true})
