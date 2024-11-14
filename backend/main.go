@@ -17,7 +17,9 @@ func main() {
 	url := os.Getenv("JACKETT_URL")
 	key := os.Getenv("JACKETT_APIKEY")
 	j := jackett.New(url, key)
-	t := transmission.New("192.168.1.100", "", "")
+
+	transmissionUrl := os.Getenv("TRANSMISSION_URL")
+	t := transmission.New(transmissionUrl, "", "")
 
 	e := echo.New()
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
