@@ -1,4 +1,6 @@
 <template>
+  <DownloadFolderList id="downloadModal" :folders="getFolders" @save="downloadToFolder" @close="close"/>
+
   <div class="toast-container position-fixed top-0 start-50 translate-middle-x pt-3">
     <div class="toast align-items-center text-bg-primary border-0" id="toastForSuccess" role="status"
          aria-live="assertive" aria-atomic="true">
@@ -71,17 +73,21 @@
               <i class="bi bi-person-fill-down"></i>
             </th>
             <th scope="col">
+              <i class="bi bi-globe"></i>
+            </th>
+            <th scope="col">
               <i class="bi bi-hdd-fill"></i>
             </th>
             <th scope="col"></th>
           </tr>
           </thead>
           <tbody>
-          <tr v-for="item in getItems" :key="item">
+          <tr v-for="item in getItems" :key="item.downloadLink">
             <td>
-              <i class="btn btn-primary bi bi-download" @click="download(item)"></i>
+              <i class="btn btn-primary bi bi-download" @click="downloadItems(item)"></i>
             </td>
             <td>{{ item.seeders }}</td>
+            <td style="text-align: center">{{ item.trackerId }}</td>
             <td>{{ toShortSize(item.size) }}</td>
             <td>
               <div style="margin-left: 15px">
@@ -98,11 +104,12 @@
 
 <script setup lang="ts">
 import axios, {AxiosError, isAxiosError} from 'axios';
-import {Toast} from "bootstrap";
+import {Toast, Modal} from "bootstrap";
 import {computed, onMounted, ref} from 'vue'
-import {Torrent} from "@/models/torrent";
+import {Torrent} from '@/models/Torrent';
 import {gb, tenGb, toShortSize} from "@/helper/size";
 import {DownloadResult} from "@/models/DownloadResult";
+import DownloadFolderList from "@/components/DownloadFolderList.vue";
 
 const movieName = ref<string>('');
 const movieYear = ref<string>('');
@@ -112,13 +119,17 @@ const more10gb = ref<boolean>(true);
 const between1and10gb = ref<boolean>(true);
 const less1gb = ref<boolean>(true);
 const items = ref<Torrent[]>([])
+const folders = ref<string[]>([])
 let toastSuccess: Toast | null = null;
 let toastError: Toast | null = null;
+let downloadFoldersModal: Modal | null = null;
+let itemsTorrent: Torrent | null = null;
 const errorMessage = ref<string | unknown>('');
 
 onMounted(() => {
   toastSuccess = new Toast('#toastForSuccess');
   toastError = new Toast('#toastForError', {autohide: false});
+  downloadFoldersModal = new Modal('#downloadModal', {keyboard: false});
 })
 
 const getItems = computed(() => {
@@ -132,6 +143,10 @@ const getItems = computed(() => {
     return more10gb.value && size >= tenGb;
 
   })
+})
+
+const getFolders = computed(() => {
+  return folders.value
 })
 
 async function search(): Promise<void> {
@@ -149,18 +164,18 @@ async function search(): Promise<void> {
   }
 }
 
-async function download(torrent: Torrent): Promise<void> {
+async function downloadFolders(): Promise<void> {
+  isDownload.value = true
+  folders.value = []
   try {
-    const request = {trackerId: torrent.trackerId, downloadLink: torrent.downloadLink};
-    const {data} = await axios.post<DownloadResult>("/api/download", request);
-    if (data.result) {
-      showToastSuccess()
-    } else {
-      showToastError(data.errorMessage)
-    }
+    const {data} = await axios.get<string[]>("/api/folders-for-download")
+    folders.value = data;
+    downloadFoldersModal?.show();
   } catch (error) {
     const err = isAxiosError(error) ? (error as AxiosError).message : error;
     showToastError(err);
+  } finally {
+    isDownload.value = false
   }
 }
 
@@ -172,6 +187,35 @@ function showToastError(message: string | unknown): void {
 function showToastSuccess(): void {
   toastSuccess?.show();
 }
+
+async function downloadToFolder(folder: string): Promise<void> {
+  downloadFoldersModal?.hide();
+  try {
+    if (!itemsTorrent) {
+      return;
+    }
+    const request = {trackerId: itemsTorrent.trackerId, downloadLink: itemsTorrent.downloadLink, downloadDir: folder};
+    const {data} = await axios.post<DownloadResult>("/api/download", request);
+    if (data.result) {
+      showToastSuccess();
+    } else {
+      showToastError(data.errorMessage);
+    }
+  } catch (error) {
+    const err = isAxiosError<{message: string}>(error) ? `${(error as AxiosError).message} - ${(error as AxiosError<{message: string}>).response?.data?.message}` : error;
+    showToastError(err);
+  }
+}
+
+const close = () => {
+  downloadFoldersModal?.hide()
+}
+
+const downloadItems = async (items: Torrent): Promise<void> => {
+  itemsTorrent = items;
+  await downloadFolders();
+}
+
 </script>
 
 <style lang="scss">
@@ -193,7 +237,7 @@ function showToastSuccess(): void {
       color: #428bca;
 
       &:visited {
-        color: #565e64!important;
+        color: #565e64 !important;
       }
     }
   }
